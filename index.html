@@ -1,21 +1,26 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>منصة المهندسين | الإصدار الهادئ والمبوب</title>
+    <title>منصة المهندسين | الإصدار المطور</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
+    <!-- إضافة مكتبة html2pdf لطباعة الطلبات كـ PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <style>
         /* ألوان هادية جداً ومريحة للعين */
         :root { 
-            --main: #2c3e50;    /* أزرق رمادي داكن للهيدر */
-            --blue: #4a90e2;    /* أزرق هادئ للزراير */
-            --bg: #f4f7f6;      /* خلفية رمادي مائل للأخضر الفاتح جداً */
+            --main: #2c3e50; 
+            --blue: #4a90e2; 
+            --bg: #f4f7f6; 
             --white: #ffffff; 
-            --danger: #e74c3c;  /* أحمر هادئ للحذف */
+            --danger: #e74c3c; 
+            --success: #2ecc71;
             --text: #34495e; 
         }
 
@@ -36,8 +41,9 @@
         }
         .btn-main { background: var(--blue); color: var(--white); }
         .btn-main:hover { opacity: 0.9; }
+        .btn-success { background: var(--success); color: var(--white); }
+        .btn-success:hover { opacity: 0.9; }
 
-        /* شريط التصنيفات (الفلاتر) */
         .filters {
             display: flex; gap: 10px; justify-content: center; padding: 20px 10px;
             overflow-x: auto; white-space: nowrap; margin-top: 10px;
@@ -51,7 +57,6 @@
         .container { max-width: 1100px; margin: 0 auto 50px; padding: 0 15px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
 
-        /* كارت المهندس */
         .eng-card {
             background: var(--white); border-radius: 12px; padding: 20px;
             border: 1px solid #e0e6ed; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.02);
@@ -59,7 +64,6 @@
         .eng-card h4 { font-size: 1.2rem; margin: 10px 0; color: var(--main); }
         .spec-tag { background: #eef2f5; color: var(--blue); padding: 3px 10px; border-radius: 15px; font-size: 0.8rem; }
         
-        /* أيقونة الحذف */
         .delete-btn {
             position: absolute; top: 15px; left: 15px; color: var(--danger);
             cursor: pointer; font-size: 1.1rem; background: #fdf0ef;
@@ -67,7 +71,7 @@
         }
         .delete-btn:hover { background: var(--danger); color: white; }
 
-        /* المودال (الشاشات المنبثقة) */
+        /* ستايل المودال */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(44, 62, 80, 0.6); display: none; justify-content: center; align-items: center; z-index: 2000;
@@ -76,6 +80,7 @@
             background: var(--white); width: 95%; max-width: 450px; padding: 25px;
             border-radius: 15px; max-height: 90vh; overflow-y: auto; text-align: center;
         }
+        .modal-content.large { max-width: 800px; }
         .modal-content h3 { margin-bottom: 15px; color: var(--main); }
         
         input, select, textarea { 
@@ -83,27 +88,38 @@
             border-radius: 8px; text-align: right; 
         }
 
-        /* تنسيق فودافون كاش */
         .vf-cash-box {
             background: #e60000; color: white; padding: 15px; border-radius: 10px;
             margin-bottom: 15px; text-align: center; font-weight: bold;
         }
 
+        /* ستايل جدول الطلبات */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: right; }
+        th { background-color: var(--main); color: white; }
+        .req-img { max-width: 100px; border-radius: 5px; cursor: pointer; }
+
         #toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: var(--main); color: white; padding: 10px 20px; border-radius: 8px; display: none; z-index: 3000;
         }
+
+        /* حاوية مؤقتة للطباعة */
+        #printTemplate { display: none; padding: 20px; direction: rtl; text-align: right; font-family: 'Cairo', sans-serif; background: #fff;}
     </style>
 
+    <!-- إضافة Firebase و Storage -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 </head>
 <body>
 
 <header>
     <div class="logo">منصة المهندسين</div>
     <div class="nav-actions">
+        <!-- زر عرض الطلبات للمدير -->
+        <button class="btn btn-success" onclick="openRequestsModal()"><i class="fas fa-list"></i> الطلبات</button>
         <button class="btn btn-main" onclick="openModal('engModal')"><i class="fas fa-plus"></i> إضافة مهندس</button>
     </div>
 </header>
@@ -122,6 +138,7 @@
     </div>
 </div>
 
+<!-- مودال إضافة مهندس -->
 <div class="modal" id="engModal">
     <div class="modal-content">
         <h3>تسجيل مهندس جديد</h3>
@@ -141,6 +158,7 @@
     </div>
 </div>
 
+<!-- مودال طلب التواصل (تم إضافة حقل الصورة) -->
 <div class="modal" id="contactModal">
     <div class="modal-content">
         <h3>طلب تواصل مع المهندس</h3>
@@ -149,14 +167,58 @@
             برجاء تحويل 100 ج.م للرقم:<br>
             <span style="font-size:1.3rem;">01026336159</span>
         </div>
-        <form id="contactForm" onsubmit="sendContactEmail(event)">
-            <input type="hidden" id="targetEngName" name="eng_name">
-            <input type="text" id="cName" name="user_name" placeholder="اسمك" required>
-            <input type="tel" id="cPhone" name="vf_number" placeholder="الرقم اللي حولت منه فودافون كاش" required>
-            <textarea id="cMsg" name="message" placeholder="رسالتك أو تفاصيل طلبك للمهندس..." rows="3" required></textarea>
-            <button type="submit" class="btn btn-main" style="width:100%;">تأكيد التحويل وإرسال الطلب</button>
+        <form id="contactForm" onsubmit="submitContactRequest(event)">
+            <input type="hidden" id="targetEngName">
+            <input type="text" id="cName" placeholder="اسمك الكريم" required>
+            <input type="tel" id="cPhone" placeholder="رقم الموبايل للتواصل معك" required>
+            <textarea id="cMsg" placeholder="رسالتك أو تفاصيل طلبك للمهندس..." rows="3" required></textarea>
+            
+            <div style="text-align: right; margin-top: 10px; font-weight: bold; color: var(--main);">
+                <label for="cReceipt">صورة إيصال التحويل (إجباري):</label>
+                <input type="file" id="cReceipt" accept="image/*" required>
+            </div>
+
+            <button type="submit" id="submitReqBtn" class="btn btn-main" style="width:100%; margin-top:15px;">تأكيد التحويل وإرسال الطلب</button>
             <button type="button" onclick="closeModal('contactModal')" style="width:100%; background:none; border:none; margin-top:10px; color:#777;">إلغاء</button>
         </form>
+    </div>
+</div>
+
+<!-- مودال عرض الطلبات -->
+<div class="modal" id="requestsModal">
+    <div class="modal-content large">
+        <h3>قائمة طلبات التواصل</h3>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>العميل</th>
+                        <th>رقم التواصل</th>
+                        <th>المهندس المطلوب</th>
+                        <th>صورة الدفع</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="requestsTableBody">
+                    <!-- سيتم حقن الطلبات هنا -->
+                </tbody>
+            </table>
+        </div>
+        <button type="button" onclick="closeModal('requestsModal')" class="btn btn-main" style="margin-top:20px;">إغلاق</button>
+    </div>
+</div>
+
+<!-- قالب مخفي يتم استخدامه للطباعة PDF -->
+<div id="printTemplate">
+    <h2 style="color: #2c3e50; border-bottom: 2px solid #4a90e2; padding-bottom: 10px; margin-bottom: 20px;">تفاصيل طلب التواصل</h2>
+    <p><strong>اسم العميل:</strong> <span id="pClientName"></span></p>
+    <p><strong>رقم التواصل:</strong> <span id="pClientPhone"></span></p>
+    <p><strong>المهندس المطلوب:</strong> <span id="pEngName"></span></p>
+    <p><strong>تاريخ الطلب:</strong> <span id="pDate"></span></p>
+    <p><strong>رسالة العميل:</strong> <br><span id="pMsg" style="color: #555;"></span></p>
+    <div style="margin-top: 20px;">
+        <strong>صورة إيصال الدفع:</strong><br><br>
+        <img id="pReceiptImg" src="" style="max-width: 100%; max-height: 500px; border: 1px solid #ccc; border-radius: 8px;">
     </div>
 </div>
 
@@ -174,14 +236,12 @@
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const storage = firebase.storage(); // تفعيل التخزين
 
-    // 2. إعداد مكتبة الإيميل (EmailJS) - لاحظ الملاحظة أسفل الكود
-    (function() { emailjs.init("YOUR_PUBLIC_KEY_HERE"); })();
-
-    // متغير لحفظ كل المهندسين عشان الفلترة
     let allEngineers = [];
+    let allRequests = [];
 
-    // التحكم في النوافذ (المودال)
+    // التحكم في النوافذ والإشعارات
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     function showToast(msg) {
@@ -189,7 +249,7 @@
         t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
     }
 
-    // حفظ مهندس جديد
+    // ---------- قسم المهندسين ----------
     async function saveEng(e) {
         e.preventDefault();
         await db.collection("engineers").add({
@@ -204,26 +264,20 @@
         showToast("تم إضافة المهندس بنجاح");
     }
 
-    // جلب البيانات وعرضها
     db.collection("engineers").orderBy("at", "desc").onSnapshot(snap => {
         allEngineers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderEngineers('الكل'); // عرض الكل في البداية
+        renderEngineers('الكل');
     });
 
-    // دالة الفلترة (التصنيف)
     function filterData(category, btnElement) {
-        // تغيير لون الزرار النشط
         document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
         if(btnElement) btnElement.classList.add('active');
-        
         renderEngineers(category);
     }
 
-    // دالة رسم الكروت في الشاشة
     function renderEngineers(category) {
         const g = document.getElementById('engineersGrid');
         g.innerHTML = '';
-        
         let filtered = category === 'الكل' ? allEngineers : allEngineers.filter(eng => eng.s === category);
         
         if(filtered.length === 0) {
@@ -246,7 +300,6 @@
         });
     }
 
-    // دالة الحذف القوية
     async function deleteEng(docId) {
         if(confirm("هل أنت متأكد من حذف هذا المهندس نهائياً؟")) {
             await db.collection("engineers").doc(docId).delete();
@@ -254,38 +307,121 @@
         }
     }
 
-    // فتح شاشة فودافون كاش والإيميل
+    // ---------- قسم طلبات التواصل ----------
+
     function openContactForm(engName) {
         document.getElementById('targetEngName').value = engName;
         openModal('contactModal');
     }
 
-    // إرسال الإيميل بعد تأكيد التحويل
-    function sendContactEmail(e) {
+    // رفع الصورة وإرسال الطلب لقاعدة البيانات
+    async function submitContactRequest(e) {
         e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.innerText = "جاري الإرسال..."; btn.disabled = true;
+        const btn = document.getElementById('submitReqBtn');
+        btn.innerText = "جاري رفع الصورة وإرسال الطلب..."; 
+        btn.disabled = true;
 
-        // إرسال البيانات عبر EmailJS
-        /* emailjs.sendForm('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', e.target)
-            .then(function() {
-                showToast("تم استلام الطلب! سنتواصل معك قريباً.");
-                closeModal('contactModal');
-                e.target.reset();
-            }, function(error) {
-                alert("حدث خطأ في الإرسال: " + JSON.stringify(error));
-            }).finally(() => {
-                btn.innerText = "تأكيد التحويل وإرسال الطلب"; btn.disabled = false;
+        try {
+            // 1. الحصول على بيانات الفورم
+            const engName = document.getElementById('targetEngName').value;
+            const clientName = document.getElementById('cName').value;
+            const clientPhone = document.getElementById('cPhone').value;
+            const msg = document.getElementById('cMsg').value;
+            const file = document.getElementById('cReceipt').files[0];
+
+            // 2. رفع الصورة إلى Firebase Storage
+            const storageRef = storage.ref('receipts/' + Date.now() + '_' + file.name);
+            const uploadTask = await storageRef.put(file);
+            const receiptUrl = await uploadTask.ref.getDownloadURL();
+
+            // 3. حفظ الطلب في Firestore
+            await db.collection("requests").add({
+                clientName: clientName,
+                clientPhone: clientPhone,
+                engName: engName,
+                message: msg,
+                receiptUrl: receiptUrl,
+                timestamp: Date.now()
             });
-        */
-        
-        // محاكاة مؤقتة لحد ما تعمل حساب EmailJS
-        setTimeout(() => {
-            showToast("تم تأكيد العملية! المفروض يوصلك إيميل دلوقتي.");
+
+            showToast("تم إرسال طلبك بنجاح للمدير!");
             closeModal('contactModal');
             e.target.reset();
-            btn.innerText = "تأكيد التحويل وإرسال الطلب"; btn.disabled = false;
-        }, 1500);
+
+        } catch (error) {
+            alert("حدث خطأ أثناء الإرسال: " + error.message);
+        } finally {
+            btn.innerText = "تأكيد التحويل وإرسال الطلب"; 
+            btn.disabled = false;
+        }
+    }
+
+    // جلب الطلبات وعرضها للمدير
+    db.collection("requests").orderBy("timestamp", "desc").onSnapshot(snap => {
+        allRequests = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderRequestsTable();
+    });
+
+    function openRequestsModal() {
+        openModal('requestsModal');
+    }
+
+    function renderRequestsTable() {
+        const tbody = document.getElementById('requestsTableBody');
+        tbody.innerHTML = '';
+
+        if(allRequests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد طلبات تواصل حالياً</td></tr>';
+            return;
+        }
+
+        allRequests.forEach(req => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${req.clientName}</td>
+                    <td dir="ltr">${req.clientPhone}</td>
+                    <td>م. ${req.engName}</td>
+                    <td><a href="${req.receiptUrl}" target="_blank"><img src="${req.receiptUrl}" class="req-img" title="اضغط لتكبير الصورة"></a></td>
+                    <td>
+                        <button class="btn btn-main" onclick="generatePDF('${req.id}')"><i class="fas fa-file-pdf"></i> طباعة</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // دالة إنشاء وطباعة الـ PDF
+    function generatePDF(reqId) {
+        // البحث عن بيانات الطلب المحدد
+        const req = allRequests.find(r => r.id === reqId);
+        if(!req) return;
+
+        // تعبئة قالب الطباعة المخفي بالبيانات
+        document.getElementById('pClientName').innerText = req.clientName;
+        document.getElementById('pClientPhone').innerText = req.clientPhone;
+        document.getElementById('pEngName').innerText = "م. " + req.engName;
+        document.getElementById('pDate').innerText = new Date(req.timestamp).toLocaleString('ar-EG');
+        document.getElementById('pMsg').innerText = req.message;
+        document.getElementById('pReceiptImg').src = req.receiptUrl;
+
+        // إظهار القالب للتحويل ثم إخفاؤه
+        const element = document.getElementById('printTemplate');
+        element.style.display = 'block';
+
+        // إعدادات الـ PDF
+        const opt = {
+            margin:       10,
+            filename:     'طلب_تواصل_' + req.clientName + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // إنشاء الـ PDF
+        html2pdf().set(opt).from(element).save().then(() => {
+            element.style.display = 'none'; // إعادة إخفاء القالب بعد التحميل
+            showToast("تم تحميل ملف PDF بنجاح");
+        });
     }
 </script>
 </body>
