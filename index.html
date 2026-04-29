@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>منصة المهندسين | الإصدار الهادئ والمبوب</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* ألوان هادية جداً ومريحة للعين */
+        :root { 
+            --main: #2c3e50;    /* أزرق رمادي داكن للهيدر */
+            --blue: #4a90e2;    /* أزرق هادئ للزراير */
+            --bg: #f4f7f6;      /* خلفية رمادي مائل للأخضر الفاتح جداً */
+            --white: #ffffff; 
+            --danger: #e74c3c;  /* أحمر هادئ للحذف */
+            --text: #34495e; 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+        body { background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+        header {
+            background: var(--main); color: var(--white); padding: 15px 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000;
+        }
+        .logo { font-size: 1.2rem; font-weight: 800; }
+        .nav-actions { display: flex; gap: 10px; }
+
+        .btn {
+            padding: 8px 15px; border-radius: 8px; cursor: pointer; border: none;
+            font-weight: 600; font-size: 0.9rem; transition: 0.3s;
+        }
+        .btn-main { background: var(--blue); color: var(--white); }
+        .btn-main:hover { opacity: 0.9; }
+
+        /* شريط التصنيفات (الفلاتر) */
+        .filters {
+            display: flex; gap: 10px; justify-content: center; padding: 20px 10px;
+            overflow-x: auto; white-space: nowrap; margin-top: 10px;
+        }
+        .filter-btn {
+            padding: 8px 20px; border-radius: 20px; border: 1px solid var(--blue);
+            background: transparent; color: var(--blue); cursor: pointer; font-weight: 600;
+        }
+        .filter-btn.active { background: var(--blue); color: var(--white); }
+
+        .container { max-width: 1100px; margin: 0 auto 50px; padding: 0 15px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+
+        /* كارت المهندس */
+        .eng-card {
+            background: var(--white); border-radius: 12px; padding: 20px;
+            border: 1px solid #e0e6ed; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+        .eng-card h4 { font-size: 1.2rem; margin: 10px 0; color: var(--main); }
+        .spec-tag { background: #eef2f5; color: var(--blue); padding: 3px 10px; border-radius: 15px; font-size: 0.8rem; }
+        
+        /* أيقونة الحذف */
+        .delete-btn {
+            position: absolute; top: 15px; left: 15px; color: var(--danger);
+            cursor: pointer; font-size: 1.1rem; background: #fdf0ef;
+            padding: 8px; border-radius: 50%; transition: 0.3s;
+        }
+        .delete-btn:hover { background: var(--danger); color: white; }
+
+        /* المودال (الشاشات المنبثقة) */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 62, 80, 0.6); display: none; justify-content: center; align-items: center; z-index: 2000;
+        }
+        .modal-content {
+            background: var(--white); width: 95%; max-width: 450px; padding: 25px;
+            border-radius: 15px; max-height: 90vh; overflow-y: auto; text-align: center;
+        }
+        .modal-content h3 { margin-bottom: 15px; color: var(--main); }
+        
+        input, select, textarea { 
+            width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ced4da; 
+            border-radius: 8px; text-align: right; 
+        }
+
+        /* تنسيق فودافون كاش */
+        .vf-cash-box {
+            background: #e60000; color: white; padding: 15px; border-radius: 10px;
+            margin-bottom: 15px; text-align: center; font-weight: bold;
+        }
+
+        #toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--main); color: white; padding: 10px 20px; border-radius: 8px; display: none; z-index: 3000;
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+<body>
+
+<header>
+    <div class="logo">منصة المهندسين</div>
+    <div class="nav-actions">
+        <button class="btn btn-main" onclick="openModal('engModal')"><i class="fas fa-plus"></i> إضافة مهندس</button>
+    </div>
+</header>
+
+<div class="filters" id="filterContainer">
+    <button class="filter-btn active" onclick="filterData('الكل', this)">الكل</button>
+    <button class="filter-btn" onclick="filterData('مدني', this)">هندسة مدنية</button>
+    <button class="filter-btn" onclick="filterData('عمارة', this)">هندسة عمارة</button>
+    <button class="filter-btn" onclick="filterData('ديكور', this)">تصميم داخلي (ديكور)</button>
+    <button class="filter-btn" onclick="filterData('كهرباء', this)">هندسة كهرباء</button>
+</div>
+
+<div class="container">
+    <div class="grid" id="engineersGrid">
+        <p style="text-align: center; width: 100%;">جاري تحميل البيانات...</p>
+    </div>
+</div>
+
+<div class="modal" id="engModal">
+    <div class="modal-content">
+        <h3>تسجيل مهندس جديد</h3>
+        <form id="eF" onsubmit="saveEng(event)">
+            <input type="text" id="eN" placeholder="اسم المهندس" required>
+            <select id="eS">
+                <option value="مدني">هندسة مدنية</option>
+                <option value="عمارة">هندسة عمارة</option>
+                <option value="ديكور">تصميم داخلي (ديكور)</option>
+                <option value="كهرباء">هندسة كهرباء</option>
+            </select>
+            <input type="number" id="eE" placeholder="سنوات الخبرة" required>
+            <input type="tel" id="eP" placeholder="رقم الموبايل / واتساب" required>
+            <button type="submit" class="btn btn-main" style="width:100%; margin-top:10px;">حفظ</button>
+            <button type="button" onclick="closeModal('engModal')" style="width:100%; background:none; border:none; margin-top:10px; color:#777;">إلغاء</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="contactModal">
+    <div class="modal-content">
+        <h3>طلب تواصل مع المهندس</h3>
+        <div class="vf-cash-box">
+            الدفع عبر فودافون كاش<br>
+            برجاء تحويل 100 ج.م للرقم:<br>
+            <span style="font-size:1.3rem;">01026336159</span>
+        </div>
+        <form id="contactForm" onsubmit="sendContactEmail(event)">
+            <input type="hidden" id="targetEngName" name="eng_name">
+            <input type="text" id="cName" name="user_name" placeholder="اسمك" required>
+            <input type="tel" id="cPhone" name="vf_number" placeholder="الرقم اللي حولت منه فودافون كاش" required>
+            <textarea id="cMsg" name="message" placeholder="رسالتك أو تفاصيل طلبك للمهندس..." rows="3" required></textarea>
+            <button type="submit" class="btn btn-main" style="width:100%;">تأكيد التحويل وإرسال الطلب</button>
+            <button type="button" onclick="closeModal('contactModal')" style="width:100%; background:none; border:none; margin-top:10px; color:#777;">إلغاء</button>
+        </form>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // 1. إعدادات Firebase الخاصة بك
+    const firebaseConfig = {
+        apiKey: "AIzaSyCYcYBRbfS4ot1YTBkxS8st3cxJmxKeEl4",
+        authDomain: "syndicate-app-b99ed.firebaseapp.com",
+        projectId: "syndicate-app-b99ed",
+        storageBucket: "syndicate-app-b99ed.firebasestorage.app",
+        messagingSenderId: "304643275725",
+        appId: "1:304643275725:web:8fc7f164b97515eb3c2284"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // 2. إعداد مكتبة الإيميل (EmailJS) - لاحظ الملاحظة أسفل الكود
+    (function() { emailjs.init("YOUR_PUBLIC_KEY_HERE"); })();
+
+    // متغير لحفظ كل المهندسين عشان الفلترة
+    let allEngineers = [];
+
+    // التحكم في النوافذ (المودال)
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function showToast(msg) {
+        const t = document.getElementById('toast'); t.innerText = msg;
+        t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+    }
+
+    // حفظ مهندس جديد
+    async function saveEng(e) {
+        e.preventDefault();
+        await db.collection("engineers").add({
+            n: document.getElementById('eN').value,
+            s: document.getElementById('eS').value,
+            e: document.getElementById('eE').value,
+            p: document.getElementById('eP').value,
+            at: Date.now()
+        });
+        closeModal('engModal');
+        document.getElementById('eF').reset();
+        showToast("تم إضافة المهندس بنجاح");
+    }
+
+    // جلب البيانات وعرضها
+    db.collection("engineers").orderBy("at", "desc").onSnapshot(snap => {
+        allEngineers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderEngineers('الكل'); // عرض الكل في البداية
+    });
+
+    // دالة الفلترة (التصنيف)
+    function filterData(category, btnElement) {
+        // تغيير لون الزرار النشط
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        if(btnElement) btnElement.classList.add('active');
+        
+        renderEngineers(category);
+    }
+
+    // دالة رسم الكروت في الشاشة
+    function renderEngineers(category) {
+        const g = document.getElementById('engineersGrid');
+        g.innerHTML = '';
+        
+        let filtered = category === 'الكل' ? allEngineers : allEngineers.filter(eng => eng.s === category);
+        
+        if(filtered.length === 0) {
+            g.innerHTML = '<p style="text-align:center; width:100%;">لا يوجد مهندسين في هذا القسم حالياً.</p>';
+            return;
+        }
+
+        filtered.forEach(d => {
+            g.innerHTML += `
+                <div class="eng-card">
+                    <i class="fas fa-trash delete-btn" title="حذف المهندس" onclick="deleteEng('${d.id}')"></i>
+                    <span class="spec-tag">${d.s}</span>
+                    <h4>م. ${d.n}</h4>
+                    <p style="font-size:0.85rem; margin-bottom:15px; color:#666;">
+                        <i class="fas fa-briefcase"></i> خبرة ${d.e} سنوات
+                    </p>
+                    <button class="btn btn-main" style="width:100%" onclick="openContactForm('${d.n}')">طلب تواصل</button>
+                </div>
+            `;
+        });
+    }
+
+    // دالة الحذف القوية
+    async function deleteEng(docId) {
+        if(confirm("هل أنت متأكد من حذف هذا المهندس نهائياً؟")) {
+            await db.collection("engineers").doc(docId).delete();
+            showToast("تم الحذف بنجاح");
+        }
+    }
+
+    // فتح شاشة فودافون كاش والإيميل
+    function openContactForm(engName) {
+        document.getElementById('targetEngName').value = engName;
+        openModal('contactModal');
+    }
+
+    // إرسال الإيميل بعد تأكيد التحويل
+    function sendContactEmail(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.innerText = "جاري الإرسال..."; btn.disabled = true;
+
+        // إرسال البيانات عبر EmailJS
+        /* emailjs.sendForm('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', e.target)
+            .then(function() {
+                showToast("تم استلام الطلب! سنتواصل معك قريباً.");
+                closeModal('contactModal');
+                e.target.reset();
+            }, function(error) {
+                alert("حدث خطأ في الإرسال: " + JSON.stringify(error));
+            }).finally(() => {
+                btn.innerText = "تأكيد التحويل وإرسال الطلب"; btn.disabled = false;
+            });
+        */
+        
+        // محاكاة مؤقتة لحد ما تعمل حساب EmailJS
+        setTimeout(() => {
+            showToast("تم تأكيد العملية! المفروض يوصلك إيميل دلوقتي.");
+            closeModal('contactModal');
+            e.target.reset();
+            btn.innerText = "تأكيد التحويل وإرسال الطلب"; btn.disabled = false;
+        }, 1500);
+    }
+</script>
+</body>
+</html>
